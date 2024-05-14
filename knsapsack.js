@@ -1,16 +1,11 @@
-const { JSDOM } = require('jsdom');
-const { document } = new JSDOM().window;
-global.document = document;
-
-const Chart = require('chart.js');
+const fs = require('fs');
 
 const POPULATION_SIZE = 10;
-const MAX_GENERATIONS = 100;
+const MAX_GENERATIONS = 10;
 const MUTATION_RATE = 0.01;
 const ELITISM_PERCENTAGE = 0.1;
 const STOPPING_THRESHOLD = 0.001;
 
-// Knapsack parameters
 let numItems;
 let population;
 let fitness;
@@ -18,14 +13,13 @@ let weights;
 let values;
 let knapsackCapacity;
 
-// Function prototypes
 function initializePopulation() {
-    population = new Array(POPULATION_SIZE);
-    fitness = new Array(POPULATION_SIZE);
+    population = [];
+    fitness = [];
     for (let i = 0; i < POPULATION_SIZE; i++) {
-        population[i] = new Array(numItems);
+        population[i] = [];
         for (let j = 0; j < numItems; j++) {
-            population[i][j] = Math.round(Math.random());
+            population[i][j] = Math.round(Math.random()); // Random binary initialization
         }
     }
 }
@@ -34,15 +28,6 @@ function evaluatePopulation() {
     for (let i = 0; i < POPULATION_SIZE; i++) {
         fitness[i] = calculateFitness(population[i]);
     }
-}
-
-function evaluatePopulationWithFitness() {
-    const fitnessArray = [];
-    for (let i = 0; i < POPULATION_SIZE; i++) {
-        fitness[i] = calculateFitness(population[i]);
-        fitnessArray.push(fitness[i]);
-    }
-    return fitnessArray;
 }
 
 function selectParents(parents) {
@@ -69,7 +54,7 @@ function selectParents(parents) {
 }
 
 function crossover(parents, offspring) {
-    const crossoverPoints = 2;
+    const crossoverPoints = 2; // 2-point crossover
     for (let i = 0; i < POPULATION_SIZE; i += 2) {
         for (let j = 0; j < numItems; j++) {
             offspring[i][j] = population[parents[i][0]][j];
@@ -88,23 +73,37 @@ function mutate(offspring) {
     for (let i = 0; i < POPULATION_SIZE; i++) {
         for (let j = 0; j < numItems; j++) {
             if (Math.random() < MUTATION_RATE) {
-                offspring[i][j] = 1 - offspring[i][j];
+                offspring[i][j] = 1 - offspring[i][j]; // Flip the bit
             }
         }
     }
 }
 
 function replacePopulation(offspring) {
-    const tempPopulation = new Array(2 * POPULATION_SIZE);
-    const tempFitness = new Array(2 * POPULATION_SIZE);
+    const tempPopulation = [];
+    const tempFitness = [];
     for (let i = 0; i < POPULATION_SIZE; i++) {
-        tempPopulation[i] = population[i].slice();
+        tempPopulation[i] = population[i];
         tempFitness[i] = fitness[i];
-        tempPopulation[POPULATION_SIZE + i] = offspring[i].slice();
+        tempPopulation[POPULATION_SIZE + i] = offspring[i];
         tempFitness[POPULATION_SIZE + i] = calculateFitness(offspring[i]);
     }
 
-    tempFitness.sort((a, b) => b - a);
+    for (let i = 0; i < 2 * POPULATION_SIZE - 1; i++) {
+        for (let j = 0; j < 2 * POPULATION_SIZE - i - 1; j++) {
+            if (tempFitness[j] < tempFitness[j + 1]) {
+                // Swap fitness
+                const tempFit = tempFitness[j];
+                tempFitness[j] = tempFitness[j + 1];
+                tempFitness[j + 1] = tempFit;
+
+                // Swap population
+                const temp = tempPopulation[j];
+                tempPopulation[j] = tempPopulation[j + 1];
+                tempPopulation[j + 1] = temp;
+            }
+        }
+    }
 
     for (let i = 0; i < POPULATION_SIZE; i++) {
         for (let j = 0; j < numItems; j++) {
@@ -115,8 +114,7 @@ function replacePopulation(offspring) {
 }
 
 function calculateFitness(chromosome) {
-    let totalWeight = 0,
-        totalValue = 0;
+    let totalWeight = 0, totalValue = 0;
     for (let i = 0; i < numItems; i++) {
         if (chromosome[i] === 1) {
             totalWeight += weights[i];
@@ -124,92 +122,65 @@ function calculateFitness(chromosome) {
         }
     }
     if (totalWeight > knapsackCapacity) {
-        return 0;
+        return 0; // Invalid solution, fitness = 0
     } else {
-        return totalValue;
+        return totalValue; // Fitness is total value of items
     }
 }
 
 function printSolution(solution) {
-    console.log("Knapsack Solution:", solution.join(" "));
+    console.log("Knapsack Solution:", solution.join(' '));
 }
 
 // Main function
-async function main() {
+function main() {
     // Read data from file
-    const data = fs.readFileSync("knapsackProblem.txt", "utf8").split("\n");
+    const data = fs.readFileSync("knapsackProblem.txt", "utf8").split('\n');
     numItems = parseInt(data[0]);
-    weights = data[1].split(" ").map(Number);
-    values = data[2].split(" ").map(Number);
+    weights = data[1].split(' ').map(Number);
+    values = data[2].split(' ').map(Number);
     knapsackCapacity = parseInt(data[3]);
 
     // Print the knapsack parameters
     console.log("Number of items:", numItems);
-    console.log("Weights of items:", weights.join(" "));
-    console.log("Values of items:", values.join(" "));
+    console.log("Weights of items:", weights.join(' '));
+    console.log("Values of items:", values.join(' '));
     console.log("Knapsack capacity:", knapsackCapacity);
 
     // Initialize population
     initializePopulation();
 
     // Evolution loop
-    const fitnessProgress = [];
     for (let generation = 1; generation <= MAX_GENERATIONS; generation++) {
         // Evaluate population
-        evaluatePopulationWithFitness();
-        
-        // Store fitness values for the current generation
-        const currentFitness = [...fitness]; // Create a copy of fitness array
-        fitnessProgress.push(currentFitness);
-        
-        // Rest of your code remains unchanged...
+        evaluatePopulation();
+
+        // Print solutions for the current generation
+        console.log("Generation", generation, ":");
+        for (let i = 0; i < POPULATION_SIZE; i++) {
+            console.log("Individual", i + 1 + ":", population[i].join(' '));
+        }
+        console.log();
+
+        // Select parents
+        const parents = Array.from({ length: POPULATION_SIZE }, () => Array(2));
+        selectParents(parents);
+
+        // Perform crossover
+        const offspring = Array.from({ length: POPULATION_SIZE }, () => Array(numItems));
+        crossover(parents, offspring);
+
+        // Perform mutation
+        mutate(offspring);
+
+        // Replace population
+        replacePopulation(offspring);
     }
-
-    // Now, let's create a line chart using Chart.js
-    const chartData = {
-        labels: Array.from({ length: MAX_GENERATIONS }, (_, i) => i + 1),
-        datasets: fitnessProgress.map((fitness, index) => ({
-            label: `Individual ${index + 1}`,
-            data: fitness,
-            borderColor: `hsl(${(index * 360 / POPULATION_SIZE)}, 100%, 50%)`,
-            fill: false,
-        })),
-    };
-
-    const chartOptions = {
-        responsive: false,
-        title: {
-            display: true,
-            text: 'Fitness Progress over Generations',
-        },
-        scales: {
-            xAxes: [{
-                scaleLabel: {
-                    display: true,
-                    labelString: 'Generation',
-                },
-            }],
-            yAxes: [{
-                scaleLabel: {
-                    display: true,
-                    labelString: 'Fitness',
-                },
-            }],
-        },
-    };
-
-    const chartConfig = {
-        type: 'line',
-        data: chartData,
-        options: chartOptions,
-    };
-
-    // Generate the chart
-    const chart = new Chart('chart', chartConfig);
 
     // Print best solution
     console.log("Best solution found:");
     printSolution(population[0]);
 }
 
+// Execute main function
 main();
